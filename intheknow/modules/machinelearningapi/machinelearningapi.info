@@ -1,0 +1,14 @@
+; $Id: machinelearningapi.info,v 1.1 2008/06/27 17:52:57 kylemathews Exp $
+name = machinelearningapi
+description = "Machine learning algorithms for memetracker, clusters and sorts content"
+core = 6.x
+package = Memetracker
+php = 5.1
+dependencies[] = memetracker
+
+; Information added by drupal.org packaging script on 2008-08-30
+version = "6.x-1.1-alpha6"
+core = "6.x"
+project = "machinelearningapi"
+datestamp = "1220102714"
+
