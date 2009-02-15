@@ -1,0 +1,75 @@
+# TODO 
+SCHEDULE for alpha releases
+1. crud + javascript reporting thingy
+2. discussion tracking -- build seperate search indexes -- make so only one content per source can make into a meme
+3. refactor everything so all running on hooks
+
+when refreshing -- am killing old content objects instead of adding new ones -- should merge old with new not just replace with new. . . that's the bug someone reportedkkk
+
+ask Ben for advice on debugging problem -- it doesn't come out at first, after a few cron runs, didn't used to happen, error checking code to ensure everything is correct? seems if you do it right the first time. . . 
+do if on cleanup so it doesn't throw an error
+change distance threshold to pickness level
+email polymeme about using his link detection code
+see if I can figure out a way to 
+
+you don't delete memetrackers, you clear them (think of a better word wipe, erase) which deletes all data associated with that memetracker.
+
+
+
+memetracker_search ? need better name -- for fulltext search indicies
+
+
+
+build framework for displaying info about page, about memes and about content
+
+validate so you can't add feeds if you don't have a feedapi content source -- I've done that too many times already. . .
+
+some sort of clean-up routine to remove old clicks / content / distance info
+
+watch for feedapis being removed or nodes being removed and kill those as well
+
+find discussions -- check out functions in drupal search? http://drupal.org/node/146466 + module the guy released
+
+write block which displays all the current feed sources for that memetracker -- written into content_source -- they return list of sources they follow but just in case of feeds, node followers just return null -- make this a view with two columns of the feeds -- add on page a form for submitting additional feeds to add
+
+add more memetrackers -- drupal / LDS bloggernacle / Linux Dev (pull from KDE/Ubuntu/Debian/Gnome/Linux planets)
+tell others they can submit lists of blogs/news on different topics and I'll create a memetracker
+
+Limit each meme to maximum of one item per source
+
+unit test -- sometimes an interestingness score isn't being set on content or it comes up null for some reason. check this
+
+
+someday / maybes
+-----------------------------
+tool which takes rankings from all interestingness calculators -- sets one as base line and then shows other lines in comparison -- good for debugging + better understanding how they work in relation to each other
+
+images -- function checks if image exists, stores in memetracker_content, then imagecache on page renders image correctly -- have to make all these advanced features optional as not everyone will want them.
+
+add-on to feedapi -- go to page, pull rss feed and download the rss feed item.
+
+Add view of number of clicks different content is getting and list on a tab
+
+if a meme has a lot of momentum, let it stay active for a few days more -- have to think about this 
+
+discussion adds to content so it's distance from a node and its discussion and other content. . . perhaps more accurate?
+
+Add options for memebrowser page -- such as show "added 5 hours ago" next to source link and other options
+
+node queue integration -- for every memebrowser -- top articles -- returns nodequeue of every headline + subheadline in order. Newest articles -- returns headlines by order of appearence -- this will give rss feeds as well :>
+
+create content type just for testing that pulls in dummy content somehow -- that is stored in a temp database
+
+only redo memebrowsing page if new content is added or if 1 hour has passed -- make a lot of these things configurable in advanced tab
+
+click momentum
+
+breadcrumb = Home > Memetracker > Science
+
+on feedapi selecting thing -- split into columns -- shown feeds already using in one column and show unused feeds in another column
+
+easy way to edit feed node's title -- when hover over them on page, link to their edit page -- look at views javascript for code
+
+in issue queue do post feature request for classifying via naive_bayes -- brainstorm ideas for UI -- perhaps ask Eureka News feller to comment? -- need to ask for help more often
+
+email rough draft of presentation to Bill / Alex / Rob / Brad Flores for feedback -- ask specific questions for them to comment on
