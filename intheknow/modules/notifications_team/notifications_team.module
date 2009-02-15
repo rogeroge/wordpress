@@ -1,0 +1,283 @@
+<?php
+
+/**
+ * notifications_team provides a GUI for subscribing to content
+ *
+ * KNOWN ISSUE: Any users not available to the UI will be unsubscribe from content they may subscribe to using some other method. User #1 for example.
+ */
+
+
+/**
+ * Implementation of hook_menu()
+ */
+function notifications_team_menu() {
+  $items = array();
+  $items['notifications_team/autocomplete/%'] = array(
+    'title' => 'Notifications_team autocomplete',
+    'page callback' => 'notifications_team_autocomplete', 
+    'page arguments' => array(2),
+    'access arguments' => array('subscribe other users'), 
+    'type' => MENU_CALLBACK
+  );
+  return $items;
+}
+
+/**
+ * Implementation of hook_perms()
+ * 
+ */
+function notifications_team_perm() {
+  return array('subscribe other users');
+}
+ 
+/**
+ * Define a "delicious" like form subscribing users to nodes. 
+ * TODO - prepopulate with current user|case owner|case assignee
+ */
+function notifications_team_form($nid) {
+  // Get users
+  // Switch based on what level of og/spaces installation we have
+  $oggroup = 0;
+  if (module_exists('spaces_og') && $space = spaces_get_space()) {
+    // don't exclude system user
+    $users = spaces_og_get_users(false);
+  }
+  else if (module_exists('og') && $oggroup = og_get_group_context()) {
+    $users = array();
+    $q = db_query(og_list_users_sql(), $oggroup->nid);
+    while($u = db_fetch_object($q)){
+      $users[] = $u;
+    }
+  } else {
+    $users = array();
+    $q = db_query("SELECT uid FROM {users} WHERE status > 0");
+    while($u = db_fetch_object($q)){
+      $users[] = $u;
+    }
+  }
+  if (count($users) == 0) {
+    return array();
+  }
+
+  // Get existing subscriptions.
+  if (is_numeric($nid)) {
+    $params = array('type' => 'thread', 'event_type' => 'node');
+    $conditions = array('nid' => $nid);
+    $subscriptions = notifications_get_subscriptions($params, $conditions);
+  }
+  else {
+    $subscriptions = array();
+  }
+  $subscribers = array();
+  foreach ($subscriptions as $s) {
+    $subscribers[] = $s->uid;
+  }
+
+  $acomplete = FALSE;
+  if (count($users)>20) {
+    // have an autocomplete box and only have users on the checkboxes that are already subscribed
+    $acomplete = TRUE;
+    foreach($subscribers as $u) {
+      $user_object = user_load(array('uid'=>$u));
+      // Only allow for subscribing users who have permission.
+      // doing this check probably still worthwhile as it's possible permisions could change and still don't want subscribed but disallowed users showing up (they'll be deleted automatically anyways)
+      if (user_access('subscribe to content', $user_object)) {
+        $user_names[] = '<div><span class="uid-'. $user_object->uid .'">'. $user_object->name .'</span></div>';
+      }
+    }
+  } else {
+    foreach($users as $u) {
+      $user_object = user_load(array('uid'=>$u->uid));
+      // Only allow for subscribing users who have permission.
+      if (user_access('subscribe to content', $user_object)) {
+        $user_names[] = '<div><span class="uid-'. $user_object->uid .'">'. $user_object->name .'</span></div>';
+      }
+    }
+    if (count($user_names) == 0) {
+      return array();
+    }
+  }
+  
+  // Add javascript
+  drupal_add_js(drupal_get_path('module', 'notifications_team') .'/notifications_team.js', 'module');
+  drupal_add_css(drupal_get_path('module', 'notifications_team') .'/notifications_team.css');
+  // Build the form.
+  $form['notifications_team'] = array(
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#title' => 'Notify Users',
+    '#prefix' => '<div class="notifications_team">',
+    '#suffix' => '</div>',
+    '#tree' => TRUE,
+  );
+  $form['notifications_team']['selected']  = array(
+    '#type' => 'hidden',
+    '#default_value' => implode(',', $subscribers),
+  );
+
+  if ($acomplete) {
+    $form['notifications_team']['listed'] = array(
+      '#type' => 'textfield', 
+      '#autocomplete_path' => 'notifications_team/autocomplete/'. $oggroup->nid, 
+      '#default_value' => '',
+      '#description' => t('Enter list of usernames separated by commas'),
+      '#required' => FALSE,
+    );
+  }
+
+  $form['notifications_team']['options'] = array(
+    '#value' => @implode(' ', $user_names),
+  );
+  return $form;
+}
+
+/**
+ * Submit handler for notifications_team_form
+ */
+function notifications_team_form_submit($form, &$form_state) {
+  $uids =  explode(',', $form_state['values']['notifications_team']['selected']);
+  if ($form_state['values']['notifications_team']['listed']) {
+    $textunames = explode(',', $form_state['values']['notifications_team']['listed']);
+    foreach($textunames AS $uname) {
+      $u = db_fetch_object(db_query("SELECT uid FROM users WHERE name = '%s'", trim($uname)));
+      if ($u) {
+        $uids[] = $u->uid;
+      }
+    }
+  }
+  
+  $nid =  $form_state['values']['nid'];
+  notifications_team_update($nid, $uids);
+}
+
+/**
+ * Implementation of hook_nodeapi
+ *
+ * TODO Use notifications_ui_notifications('event trigger'...) and not hook_nodeapi. This would allow us to
+ * unify subscriptions processing for both nodes and comments into one place. ie we wouldn't need notifications_team_form_submit()
+ */
+function notifications_team_nodeapi(&$node, $op, $teaser) {
+  if (($op == 'update' || $op == 'insert') && $node->nid) {
+    $content_types = notifications_content_types('name');
+    if (isset($content_types[$node->type])) {
+      $new_uids =  explode(',', $node->notifications_team['selected']);
+      if ($node->notifications_team['listed']) {
+        $textunames = explode(',', $node->notifications_team['listed']);
+        foreach($textunames AS $uname) {
+          $u = db_fetch_object(db_query("SELECT uid FROM users WHERE name = '%s'", trim($uname)));
+          if ($u) {
+            $new_uids[] = $u->uid;
+          }
+        }
+      }
+
+      notifications_team_update($node->nid, $new_uids);
+    }
+  }
+}
+
+/**
+ * Update subscriptions for a node.
+ *
+ * @param $nid
+ *  node id
+ * @param $new_uids
+ *  ids of users to subscribe to the node.
+ */
+function notifications_team_update($nid, $new_uids) {
+  // Get and wipe existing subs for this thread
+  $params = array('type' => 'thread', 'event_type' => 'node');
+  $conditions = array('nid' => $nid);
+  $subscriptions = notifications_get_subscriptions($params, $conditions);
+  foreach ($subscriptions as $s) {
+    notifications_delete_subscription($s->sid);
+  }
+  
+  // Create subscriptions
+  $doneuids = array();
+  foreach ($new_uids as $uid) {
+    if (is_numeric($uid)) {
+      if (in_array($uid, $doneuids)) {
+        continue;
+      }
+      $doneuids[] = $uid;
+      $user_object = user_load(array('uid'=>$uid));
+      // Only allow for subscribing users who have permission.
+      if (user_access('subscribe to content', $user_object)) {
+        $subscription = array_merge($params, array('uid' => $uid, 'fields' => $conditions));
+        notifications_save_subscription($subscription);
+      }
+    }
+  }
+}
+
+/**
+ * Implementation of hook form alter.
+ *
+ * Adds the notifications_team_form and it's submission handler.
+ */
+function notifications_team_form_alter(&$form, &$form_state, $form_id) {
+  global $user;
+  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id  && user_access('subscribe other users')) {  
+    _notifications_team_addform($form, $form['type']['#value'], 'node', $form['nid']['#value']);
+  }
+  elseif ($form_id == "comment_form" && user_access('subscribe other users')) {
+    $node = node_load($form['nid']['#value']);
+    _notifications_team_addform($form, $node->type, 'comment', $node->nid);
+  }
+}
+
+/**
+ * Helper function adds new ui elements, and - if needed - submit hook.
+ *
+ * @param $form
+ *   The form api form array.
+ * @param $nid
+ *   Node id of the node to be subscribed to.
+ * @param $node_type
+ *   Type of node, used to determine if subs are active.
+ * @param $location
+ *   Form_alter location - either 'node' or 'comment'.
+ */
+function _notifications_team_addform(&$form, $node_type, $location = 'node', $nid = NULL) {
+  // Check to see it subscriptions are active for this content type.
+  $content_types = notifications_content_types('name');
+  if (isset($content_types[$node_type])) {
+    $subscriptions_form = notifications_team_form($nid);
+    if (count($subscriptions_form)) {
+      $form[] = $subscriptions_form;
+      if ($location == 'comment') {
+        $form['#submit']['notifications_team_form_submit'] = array();
+        $form['#submit'] = array_reverse($form['#submit']);
+      }
+    }
+  }
+}
+
+/**
+ * Helper function for autocompletion. Ony for user names
+ */
+function notifications_team_autocomplete($oggroup = 0, $notify = '') {
+  // The user enters a comma-separated list of destinations. We only autocomplete the last tag.
+  $array = split(',', $notify);
+
+  $string = trim(array_pop($array));
+  $matches = array();
+  if ($string) {
+    $prefix = count($array) ? implode(', ', $array) .', ' : '';
+    if ($oggroup > 0) {
+      $result = db_query_range("SELECT u.name, u.uid FROM {og_uid} ou INNER JOIN {users} u ON ou.uid = u.uid WHERE ou.nid = %d AND u.status > 0 AND LOWER(u.name) LIKE LOWER('%s%%')", $oggroup, $string, 0, 10);
+    } else {
+      $result = db_query_range("SELECT name, uid FROM {users} WHERE LOWER(name) LIKE LOWER('%s%%')", $string, 0, 10);
+    }
+    while ($user = db_fetch_object($result)) {
+      $user_object = user_load(array('uid'=>$user->uid));
+      if (user_access('subscribe to content', $user_object)) {
+        $matches[$prefix . $user->name] = $prefix . check_plain($user->name);
+      }
+   }
+  }
+
+  print drupal_to_js($matches);
+  exit();
+}
