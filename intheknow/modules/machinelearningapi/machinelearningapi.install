@@ -1,0 +1,121 @@
+<?php
+// $Id: machinelearningapi.install,v 1.5 2008/08/11 22:16:57 kylemathews Exp $
+
+/**
+ * @file
+ * Install file for machinelearningapi
+ *
+ */
+
+/*
+ * Implmentation of hook_schema().
+ */
+ 
+function machinelearningapi_schema() {
+  $schema['naive_bayes_cc'] = array(
+    'description' => t('Stores category counts for the naive bayes algorithm found
+    at naive_bayes.inc'),
+    'fields' => array(
+      'category' => array(
+        'description' => t('The category is most often just interestingness'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '30'), 
+      'count' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE),
+    ),    
+    'primary key' => array('category'),
+
+  );
+  
+  $schema['naive_bayes_fc'] = array(
+    'description' => t('Stores feature/category counts for the naive bayes algorithm
+    found at naive_bayes.inc'),
+    'fields' => array(
+      'feature' => array(
+        'description' => t('A feature is a word'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '30'),
+      'category' => array(
+        'description' => t('The category is most often just interestingness'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '30'),      
+      'count' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE),
+    ),
+    'primary key' => array('feature'),
+    'indexes' => array(
+      'naive_bayes_fc_feature_count' => array('feature', 'category'),
+    ),
+  );
+
+  $schema['machinelearningapi_distance_cache'] = array(
+    'description' => t('Caches distance data between content'),
+    'fields' => array(
+      'cid1' => array(
+        'description' => t('First of two Content IDs'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE),
+      'cid2' => array(
+        'description' => t('Second of two Content IDs'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE),
+      'search_score' => array(
+        'description' => t('Stores the search score between two cids'),
+        'type' => 'float',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'indexes' => array(
+      'cid1' => array('cid1'),
+      'cid2' => array('cid2'),
+    ),
+    'unique keys' => array(
+      'cid1_cid2' => array('cid1', 'cid2'),
+    ),
+  );
+    
+  return $schema;
+}
+
+/**
+ * Implementaton of hook_install().
+ */
+function machinelearningapi_install() {
+  drupal_install_schema('machinelearningapi');
+}
+
+/**
+ * Implementaton of hook_uninstall().
+ */
+function machinelearningapi_uninstall() {
+  drupal_uninstall_schema('machinelearningapi');
+}
+
+/*
+ * Implmentation of hook_update_N().
+ */
+ 
+function machinelearningapi_update_6100() {
+  $ret = array();
+  db_change_field($ret, 'machinelearningapi_distance_cache', 'distance_score', 
+  'search_score',
+  array('description' => t('Stores the search score between two cids'),
+        'type' => 'float',
+        'not null' => TRUE,
+        'default' => 0,
+      ));
+      
+  return $ret;
+}
