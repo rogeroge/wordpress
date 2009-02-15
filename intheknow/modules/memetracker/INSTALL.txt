@@ -1,0 +1,19 @@
+1.  After unpacking the memetracker and machinelearningapi modules, download and install Python Numeric and Pycluster. Python Numeric is a dependancy of Pycluster and must be installed first. Note, Python NumPy has replaced Python Numeric but Pycluster has not been upgraded to use NumPy. Numeric is still required.
+
+Python Numeric can be downloaded here: 
+http://sourceforge.net/project/showfiles.php?group_id=1369&package_id=1351&release_id=370308
+
+Pycluster can be downloaded here:
+http://bonsai.ims.u-tokyo.ac.jp/~mdehoon/software/cluster/software.htm#pycluster
+
+2.  Feedapi creates nodes from content it downloads from RSS feeds. Create a content type called "Feed Item". Then edit the node type "Feed", which is created by default when installing Feedapi. Under the Default Settings for "feed", change the Node type of feed items to the "Feed Item" node type you just created. Also select the options "Check for duplicates on all feeds" and "Refresh feed on creation."
+
+3.  Next add RSS feeds by creating a Feed node for each RSS feed.
+
+4.  Next navigate to http://YOURDOMAIN.com/memetracker/1/ and click on the "Edit Feed List" tab. There select the feeds you just added to be part of your memetracker
+
+5.  Then click on the view tab to see your memes.
+
+Notes
+-----------------
+For Feedapi, the Simplepie parser seems to work better than the Common Syndication Parser
