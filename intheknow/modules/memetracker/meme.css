@@ -1,0 +1,61 @@
+.discussion {
+ padding-left: 25px;
+}
+
+.toggle {
+  font-size: 18px;
+  float: left;
+  margin-top: -10px;
+  margin-right: -10px;
+}
+
+.toggle span {
+/*  background: lightblue;*/
+  padding-left: 2px;
+  padding-right: 2px;
+  padding-bottom: 6px;
+  text-align: center;
+  cursor: pointer
+}
+
+.discussion span {
+  color: darkGreen;
+  font-weight: bold;
+/*  font-size: 18px;*/
+}
+
+.discussion-min {
+  margin-top: -7px;
+}
+
+.discussion-max {
+/*  margin-top: -22px;  */
+  display: none;
+  margin-top: -22px;
+}
+
+.discussion-max .discussion-title {
+  color: darkBlue;
+  font-weight: bolder;
+}
+.discussion-max a {
+  color: darkBlue;
+  font-size: 1.2em;
+/*  font-weight: bold;*/
+}
+
+.discussion-block {
+/*  margin-left: 25px;*/
+}
+#content .discussion a {
+  text-decoration: underline;
+}
+
+#content .discussion a:hover {
+  text-decoration: none;
+}
+
+.yellow_glow {
+  background: yellow;
+  border: 1px solid darkKhaki;
+}
