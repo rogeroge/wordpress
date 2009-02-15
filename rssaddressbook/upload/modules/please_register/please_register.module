@@ -1,0 +1,325 @@
+<?php
+// $Id: please_register.module,v 1.1.2.2 2008/05/12 21:56:52 tomaszx Exp $
+
+/**
+ * Implementation of hook_init().
+ */
+function please_register_init() {
+  $path = drupal_get_path( 'module', 'please_register' );
+  drupal_add_css( $path .'/please_register.css', 'module', 'all', FALSE );
+}
+
+
+/**
+ * Implementation of hook_block().
+ */
+function please_register_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+    case 'list':
+        $blocks[0]['info'] = t('Please register');
+        $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE;
+        return $blocks;
+      break;
+
+    case 'configure':
+
+      $form['please_register_subject_auth'] = array(
+          '#type' => 'textfield', 
+          '#title' => t("Custom subject for authenticated users"),
+          '#default_value' => variable_get('please_register_subject_auth', 'Now, as privileged user, You can')
+      );
+
+      $form['please_register_subject_noauth'] = array(
+          '#type' => 'textfield', 
+          '#title' => t("Custom subject for anonymous users"),
+          '#default_value' => variable_get('please_register_subject_noauth', 'Please register')
+      );
+      
+      
+      
+      $form['info1'] = array(
+        '#type' => 'markup',
+        '#value' => '<br /><p><strong>'. t('This options are based on perm from authenticated role.') .'</strong></p>'
+      );
+      
+      $form['please_register_auth_what_can'] = array(
+          '#type' => 'checkbox', 
+          '#title' => t("Show authenticated users what can do it"),
+          '#default_value' => variable_get('please_register_auth_what_can', 1)
+      );
+      
+ 
+      $form['info2'] = array(
+        '#type' => 'markup',
+        '#value' => '<br /><p><strong>'. t('This options are based on perm from anonymous role.'). '</strong></p>'
+      );
+
+      $form['please_register_anon_what_can'] = array(
+          '#type' => 'checkbox', 
+          '#title' => t("Show anonymous what can do it"),
+          '#default_value' => variable_get('please_register_anon_what_can', 1)
+      );
+      $form['please_register_info_what_can'] = array(
+          '#type' => 'textfield', 
+          '#title' => t("Custom info about what user can"),
+          '#default_value' => variable_get('please_register_info_what_can', 'Currently you can')
+      );
+            
+      
+      $form['please_register_anon_what_not_can'] = array(
+          '#type' => 'checkbox', 
+          '#title' => t("Show anonymous what cannot do it"),
+          '#default_value' => variable_get('please_register_anon_what_not_can', 1)
+      );
+      $form['please_register_info_why_register'] = array(
+          '#type' => 'textfield', 
+          '#title' => t("Custom info about why user should register"),
+          '#default_value' => variable_get('please_register_info_why_register', 'When you register as a member you can also')
+      );
+
+
+      $info3 = '<br /><p><strong>'. t("You can add some own perm to display anonymous users and inform they what can and not can do it.") .'</strong></p>';
+      $form['info3'] = array(
+        '#type' => 'markup',
+        '#value' => $info3
+      );
+      
+      
+      $options =  array(
+        'none' => t('None'),
+        'all' => t('All'),
+        'anonymous' => t('anonymous'),
+        'authenticated' => t('authenticated'),
+      );
+
+      $form['please_register_deny_list_select'] = array(
+        '#type' => 'select',
+        '#title' => t('Display users with role'),
+        '#default_value' => variable_get('please_register_deny_list_select','both'),
+        '#options' => $options,
+        '#description' => '',
+      );
+      $form['please_register_deny_list'] = array(
+        '#type' => 'textarea',
+        '#title' => t('Custom DENY list '),
+        '#default_value' => variable_get('please_register_deny_list', ''),
+        '#width' => 40,
+        '#height' => 10,
+        '#description' => t("Enter one perm per line. Example: !example", array('!example' => '<em>access custom page</em>')),
+      );
+
+      
+      $form['please_register_allow_list_select'] = array(
+        '#type' => 'select',
+        '#title' => t('Display users with role'),
+        '#default_value' => variable_get('please_register_allow_list_select','both'),
+        '#options' => $options,
+        '#description' => '',
+      ); 
+      $form['please_register_allow_list'] = array(
+        '#type' => 'textarea',
+        '#title' => t('Custom ALLOW list '),
+        '#default_value' => variable_get('please_register_allow_list', ''),
+        '#width' => 40,
+        '#height' => 10,
+        '#description' => t("Enter one perm per line. Example: !example", array('!example' => '<em>access custom administer</em>')),
+      );
+
+
+      return $form;
+
+    case 'save':
+      variable_set('please_register_anon_what_can', $edit['please_register_anon_what_can']);
+      variable_set('please_register_anon_what_not_can', $edit['please_register_anon_what_not_can']);
+      variable_set('please_register_auth_what_can', $edit['please_register_auth_what_can']);
+      variable_set('please_register_deny_list', $edit['please_register_deny_list']);
+      variable_set('please_register_deny_list_select', $edit['please_register_deny_list_select']);
+      variable_set('please_register_allow_list', $edit['please_register_allow_list']);
+      variable_set('please_register_allow_list_select', $edit['please_register_allow_list_select']);
+      
+      variable_set('please_register_info_what_can', $edit['please_register_info_what_can']);
+      variable_set('please_register_info_why_register', $edit['please_register_info_why_register']);
+
+      variable_set('please_register_subject_auth', $edit['please_register_subject_auth']);
+      variable_set('please_register_subject_noauth', $edit['please_register_subject_noauth']);
+
+      break;
+
+    case 'view':
+        $content = array();
+        $rows = array();
+        $header = array();
+        $anonymous = array();
+        $authenticated = array();
+        $ar_can = array();
+        $ar_not = array();
+
+        $path = drupal_get_path('module', 'please_register');
+
+       if ( user_is_anonymous() ){
+          $sql_anonymous = db_query('SELECT perm FROM {permission} WHERE rid = %d', DRUPAL_ANONYMOUS_RID );
+          $sql_authenticated = db_query('SELECT perm FROM {permission} WHERE rid = %d', DRUPAL_AUTHENTICATED_RID );
+          if ($re = db_result($sql_anonymous) ){
+            $anonymous = explode(', ', $re);
+          }
+          if ($re2 = db_result($sql_authenticated)) {
+            $authenticated = explode(', ',$re2);
+          }
+
+          if ( variable_get('please_register_anon_what_not_can', 1) == 1 ) {
+            $not_can = array_diff($authenticated, $anonymous);
+            foreach ($not_can as $v){
+              $ar_not[] = array( theme_image( $path.'/images/delete.png', 'alt', 'title'), t($v) );
+            }
+          }
+           
+          // custom deny
+          if ( ( $please_register_deny_list = variable_get('please_register_deny_list','') ) != ''
+             && (
+               variable_get('please_register_deny_list_select', 'all') == 'anonymous' ||
+               variable_get('please_register_deny_list_select', 'all') == 'all'
+             )
+          )
+          {
+            $ar_deny = explode("\n",$please_register_deny_list);
+            foreach ($ar_deny as $d) {
+              if (($d = trim($d)) != ''){
+                $ar_not[] = array( theme_image( $path.'/images/delete.png', 'alt', 'title'), t($d) );
+              }
+            }
+          }  
+          
+          sort($ar_not);
+          
+          
+          if ( variable_get('please_register_anon_what_can', 1) == 1 ) {
+            foreach ($anonymous as $w ){
+              $ar_can[] = array( theme_image( $path.'/images/accept.png', 'alt', 'title'), t($w) );
+            }
+          }
+          
+          // custom allow
+          if ( ( $please_register_allow_list = variable_get('please_register_allow_list','') ) != '' 
+             && (
+               variable_get('please_register_allow_list_select', 'all') == 'anonymous' ||
+               variable_get('please_register_allow_list_select', 'all') == 'all'
+             )
+          ) 
+          {
+            $ar_allow = explode("\n",$please_register_allow_list);
+            foreach ($ar_allow as $a) {
+              if (($a = trim($a)) != ''){
+                $ar_can[] = array( theme_image( $path.'/images/accept.png', 'alt', 'title'), t($a) );
+              }
+            }
+          }
+
+          sort($ar_can);
+
+          $a = array_merge($ar_can, $ar_not);
+          if (count($a)) {
+            if ( variable_get('please_register_anon_what_can', 1) == 1 && variable_get('please_register_anon_what_not_can', 1) == 0 ) {
+              $content[] = t(variable_get('please_register_info_what_can', 'See below what you can.'));
+              $rows += $ar_can;
+            }
+            else {
+              if ( count($ar_can) ) {
+                // can
+                $info11 = t(variable_get('please_register_info_what_can', 'Currently you can'));
+                $rows[] = array( 
+                  array(
+                    'data' => $info11, 'colspan' => 2, 'class' => 'please_register_what'
+                  )
+                );
+                $rows += $ar_can;
+              }
+              
+              if ( count($ar_not) ) {
+                // cannot
+                $info12 = t(variable_get('please_register_info_why_register', 'When you register as a member you can also'));
+                $rows[] = array( 
+                  array(
+                    'data' => $info12, 'colspan' => 2, 'class' => 'please_register_why'
+                  )
+                );
+                $rows = array_merge($rows, $ar_not);
+              }
+            }
+          }
+        }
+        else { // authenticated
+          global $user;
+          $u = array();
+          $ar_custom = array();
+          $ar_auth_can = array();
+          $ar_auth_custom = array();
+          
+          if (variable_get('please_register_auth_what_can', 1)) {
+            $a_rids = array_keys($user->roles);
+            $placeholders = db_placeholders($a_rids);
+            $rids = implode(', ',$a_rids);
+            $sql_user = db_query('SELECT perm FROM {permission} WHERE rid IN ('. $placeholders .')', $rids);
+            if ($result = db_result($sql_user)){
+              $u = explode(', ', $result);
+            }
+            foreach ($u as $z ){
+              $ar_auth_can[] = array(theme_image( $path.'/images/accept.png', 'alt', 'title'), t($z));
+            }
+          }
+          
+          // add custom allow
+          if ( ( $please_register_allow_list = variable_get('please_register_allow_list','') ) != '' 
+             && (
+               variable_get('please_register_allow_list_select', 'all') == 'authenticated' ||
+               variable_get('please_register_allow_list_select', 'all') == 'all'
+             )
+          ) 
+          {
+            $ar_allow = explode("\n",$please_register_allow_list);
+            foreach ($ar_allow as $a) {
+              if (($a = trim($a)) != ''){
+                $ar_auth_can[] = array( theme_image( $path.'/images/accept.png', 'alt', 'title'), t($a) );
+              }
+            }
+          }
+          sort($ar_auth_can);
+
+
+          // custom deny
+          if ( ( $please_register_deny_list = variable_get('please_register_deny_list','') ) != ''
+             && (
+               variable_get('please_register_deny_list_select', 'all') == 'authenticated' ||
+               variable_get('please_register_deny_list_select', 'all') == 'all'
+             )
+          )
+          {
+            $ar_deny = explode("\n",$please_register_deny_list);
+            foreach ($ar_deny as $d) {
+              if (($d = trim($d)) != ''){
+                $ar_auth_custom[] = array( theme_image( $path.'/images/delete.png', 'alt', 'title'), t($d) );
+              }
+            }
+          }
+          sort($ar_auth_custom);
+
+          $rows = array_merge($ar_auth_custom, $ar_auth_can);  
+        }
+
+        if (count($rows)) {
+          $content[] .= theme('table', $header, $rows, array('id' => 'please_register'));
+          if (!$user->uid) {
+            $content[] .= '<br />'. l(t('You can register now'), 'user/register', array('attributes' => array('class' => 'please_register_hotlink')));
+          }
+        }
+
+        if (count($content)) {
+          $block['content'] = implode('', $content);
+          $subject_auth = t(variable_get('please_register_subject_auth', 'Now, as privileged user, You can'));
+          $subject_noauth = t(variable_get('please_register_subject_noauth', 'Please register'));
+          $block['subject'] = ($user->uid) ? $subject_auth : $subject_noauth;
+          $block['weight'] = -50;
+          return $block;
+        }
+    }
+}
+
