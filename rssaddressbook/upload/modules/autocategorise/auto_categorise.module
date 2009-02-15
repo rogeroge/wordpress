@@ -1,0 +1,184 @@
+<?php
+// $Id: auto_categorise.module,v 1.6 2008/11/17 21:01:14 matslats Exp $
+
+/**
+ * @file
+Users cannot be trusted to categorise things themselves, and it's too much work for administrators. 
+Vocabulary terms are applied using by matching against term synonyms. Synonyms can be words or word stems. If a vocabulary is 'required', then the heaviest term will not be used for matching but will be applied if there are no matches. It becomes a catch-all.
+The module provides a checkbox in the vocabulary edit settings fieldset, which puts the module into action when a node is submitted. The synonyms in the vocabulary iterate through the the title and body of the node looking for a match or matches.
+The module also provides a button on that page, which will recategorise all the content in the governed types. This means the whole category system is flexible and can evolve and be tweaked.
+ */
+ 
+/**
+ * Implementation of hook_help)().
+ * http://api.drupal.org/api/function/hook_help/6
+ */
+function auto_categorise_module_help($section) {
+  switch ($section) {
+    case 'admin/help#search':
+      return '<p>'. t('Allows contentTypes to be automatically categorised by a vocabulary, either on submission, or when prompted on the settings page') .'</p>';
+    case 'admin/content/taxonomy/autocategorise':
+      return '<p>'. t('For each ContentType listed here, there is a button ') .'</p>';
+  }
+}
+
+/**
+ * Implementation of hook_form_alter)().
+ * http://api.drupal.org/api/function/hook_form_alter/6
+ * Perform alterations before a form is rendered.
+ */
+function auto_categorise_form_alter(&$form, $form_state, $form_id) {
+  //on the contentType_node_form, we need to remove the taxonomy fields for autovocabs
+  if (strpos($form_id, '_node_form')){
+    $all_autovocabs = variable_get('auto_vids', array());
+    if (count($all_autovocabs)){
+      foreach ($all_autovocabs as $vid){
+        unset($form['taxonomy'][$vid]);
+      }
+    }
+  }
+  
+  //reminds users that even with autocategorisations, they still need to apply the vocabulary to the contentType on the vocabulary settings page
+  else if ($form_id == "taxonomy_form_vocabulary"){
+    $autoSetting=is_auto_vocab(arg(5));
+    $form['content_types']['nodes']['#description'].= " ".t("Select these even if you want autocategorisation.");
+    $form['settings']['auto']= array(
+        '#type' => 'checkbox',
+        '#title' => t('Apply automatically to contentTypes listed above'),
+        '#default_value' => $autoSetting,
+        '#description' => t('When a node is submitted this vocabulary will scan it looking for matches against the term names and synonyms. when a match is found the term is applied.')
+      );
+	$form['Auto-categorise']=array(
+      '#type'=>'submit',
+	  '#value'=>'autocategorise'
+    );
+    $form['#submit'][] ='taxonomy_form_vocabulary_submit_auto';
+  }
+} 
+ 
+/**
+ * Implementation of hook_nodeapi)().
+ * http://api.drupal.org/api/function/hook_nodeapi/6
+ */
+function auto_categorise_nodeapi($node, $op) {
+  if ($op=='insert' || $op=='update'){
+    //get the node-type of this node
+    $db_result = db_query("SELECT v.vid FROM {vocabulary_node_types} AS t LEFT JOIN vocabulary AS v ON t.vid = v.vid WHERE t.type='".$node->type."'");
+    while ($result =db_fetch_object($db_result)){
+      if (is_auto_vocab($result ->vid)){
+        $catch_all=auto_catch_all_term($result->vid);
+        $terms=get_synonyms($result->vid);
+        $vocab= taxonomy_vocabulary_load($result->vid);
+        $multiple=$vocab->multiple;
+        $misc=_apply_terms_to_node($node, $terms, $catch_all, $multiple);
+
+      }	
+    }
+  }
+}
+
+//process the auto-checkbox on admin/content/taxonomy/edit/vocabulary/
+function taxonomy_form_vocabulary_submit_auto($form, &$form_state){
+  if ($form['#post']['op']=='autocategorise'){
+    if ($types=$form['#post']['nodes']){
+      autocategorise_vocab($form['vid']['#value'], $types);
+    }else{
+      drupal_set_message(t('You need to select some contentTypes for this vocabulary before you can autocategorise'));
+    }
+  } 
+  elseif ($form['#post']['op']=='Save'){
+	 $vArray=variable_get('auto_vids', array());
+	 $vArray[$form['vid']['#value']] = $form['settings']['auto']['#value'];
+	 variable_set('auto_vids', $vArray);
+  }
+}
+
+//goes through every node in contentTypes governed by the autovocab
+function autocategorise_vocab($vid=false, $types){
+  //get all the nodes for the contentType(s)
+  foreach ($types as $type){
+    $t[]="type = '".$type."'";
+  }
+  $where = implode(" OR ", $t);
+  $sqlStr="SELECT n.nid, r.vid, n.title, r.body FROM {node} as n LEFT JOIN {node_revisions} AS r ON n.vid=r.vid WHERE ".$where;
+  //drupal_set_message($sqlStr);
+  $results = db_query($sqlStr);
+  while ($result=db_fetch_object($results)){
+    $nodes[] = $result;
+  }
+  if (!count($nodes)) {
+    drupal_set_message(t('There were no nodes to categorise in any of the following types: ') . implode(",",$types), 'warning');
+  }
+  $catch_all=auto_catch_all_term($vid);
+  $terms=get_synonyms($vid);
+  foreach ($nodes as $node){
+    $misc[] =_apply_terms_to_node($node, $terms, $catch_all, $multiple=0);
+  }
+}
+
+function _apply_terms_to_node($node, $terms, $catch_all_tid, $multiple=0){
+  $haystack = strtolower($node->title . $node->body);
+  foreach ($terms as $tid=>$term){
+    foreach ($term as $synonym){
+      if (is_int(strpos($haystack, strtolower($synonym)))){
+        $matches[]=$tid;
+        //if the vocab is not multiple we exit after the first match
+        if (!$multiple){
+          break;
+        }
+      }
+    }
+  }
+  if (empty($matches)){
+    $matches[]=$catch_all_tid;
+   // $misc=$node->nid;
+  }
+  //need to remove all the terms from this vocabulary for this node and resave them
+  db_query('DELETE FROM {term_node} WHERE nid = %d', $node->nid);
+  taxonomy_node_save($node, $matches);
+}
+
+//returns an array with terms and synonyms indexed by tid
+function get_synonyms($vid){
+  $db_result = db_query("SELECT t.tid, t.name as termname, s.name as fragment
+	  FROM {term_data} AS t
+    LEFT JOIN {term_synonym} AS s 
+	  ON t.tid = s.tid
+	  WHERE vid = %d AND s.name IS NOT NULL
+	  ORDER BY s.tid", $vid);
+  while ($synonym = db_fetch_object($db_result)){
+	  $synonyms[$synonym->tid][]=$synonym->termname;
+	  $synonyms[$synonym->tid][]=$synonym->fragment;
+    $synonyms[$synonym->tid] = array_unique($synonyms[$synonym->tid]);
+  }
+  return $synonyms;
+}
+
+//checks to see if a contentType is tagged by an auto-vocabulary
+function type_has_auto_vocab($type){
+  //all the vocabulary objects applied to the type:
+  $vocabs = taxonomy_get_vocabularies($type);
+  //all the automatic vocab ids
+  $autoVocabs= variable_get('auto_vids', array());
+  
+  foreach ($vocabs as $vocab){
+    if (in_array($vocab ->vid, $autoVocabs)){
+      return TRUE;
+    }  
+  }
+}
+
+//checks to see if a vocabulary is defined as automatic
+function is_auto_vocab($vid){
+  $autoVocabs= variable_get('auto_vids', array());
+  return $autoVocabs[$vid];
+}
+
+//finds the heaviest term in the vocabulary, for use as misc
+function auto_catch_all_term($vid){
+  $terms = taxonomy_vocabulary_load($vid);
+  $result = db_query("SELECT tid FROM {term_data} WHERE vid = '".$vid."' ORDER by weight DESC LIMIT 0,1");
+  $misc=db_fetch_array($result);
+  return $misc['tid']; 
+}
+?>
