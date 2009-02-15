@@ -1,0 +1,16 @@
+
+
+td.please_register_what {
+  font-weight: bold;
+  background: white;
+}
+
+td.please_register_why {
+  font-weight: bold;
+  background: white;
+}
+
+
+table#please_register {
+  margin: 0px;
+}
