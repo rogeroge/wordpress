@@ -1,0 +1,370 @@
+<?php
+// $Id: memetracker.test,v 1.6 2008/08/30 13:11:17 kylemathews Exp $
+
+class MemetrackerModuleTestCase extends DrupalTestCase {
+//TODO add tests for each method / function
+
+  function get_info() {
+    return array(
+      'name' => t('Memetracker functionality'),
+      'desc' => t('Thoroughly test Memetracker administration and user interfaces.'),
+      'group' => t('Memetracker Tests'),
+    );
+  }
+
+/**
+   * SimpleTest core method: code run before each and every test method.
+   *
+   * Optional. You only need this if you have setup tasks.
+   */
+  function setUp() {
+    parent::setUp();
+
+    // Setup tasks go here.
+    include_once './'. drupal_get_path('module', 'memetracker') .'/content_source.inc';
+    
+    }
+  /**
+   * SimpleTest core method: code run after each and every test method.
+   *
+   * Optional. You only need this if you have teardown tasks.
+   */
+  function tearDown() {
+    // Teardown tasks go here.
+    
+    // Delete dummy click data I created
+    db_query("DELETE FROM {memetracker_clicks} WHERE cid = %d and mid = %d",
+    23141221, 1131);
+    
+    parent::tearDown();
+  }
+
+/**************************************************************
+*** Tests for memetracker.module
+***************************************************************/
+
+  /**
+   * Test loading of memetracker, uses default memetracker created initially
+   * Test of memetracker_load function in memetracker.module
+   */
+  function testMemetrackerLoad() {
+    $memetracker = memetracker_load(1);
+    $this->assertEqual('1', $memetracker->get_mid(), t('Make sure memetracker_load,
+    loads object with correct mid'));
+  }
+
+  /**
+   * Test loading of memetracker, tests validation of memetracker_load in memetracker.module 
+   * by passing in a word
+   */
+  function testMemetrackerLoadValidation() {
+    $memetracker = memetracker_load('chicken');
+    $this->assertFalse($memetracker, t('Make sure memetracker_load
+    validates non-numeric MIDs'));
+  }
+  
+  /**
+   * Tests validation of memetracker_load in memetracker.module by trying to load a memetracker object
+   * which doesn't exist
+   */
+  function testMemetrackerLoadValidation2() {
+    $memetracker = memetracker_load('1231321322');
+    $this->assertFalse($memetracker, t('Make sure memetracker_load
+    will not load memetrackers which do not exist'));
+  }
+  
+  
+  /*
+   * Tests memetracker_set_click in memetracker.module by passing in a dummy click and checking that it shows
+   * up in the database 
+   */
+  function testMemetrackerSetClick() {
+    memetracker_set_click(1131, 23141221); // eventually when I have a function to create
+    // memetrackrs, create a new one and then use that dummy memetracker here
+    $result = db_result(db_query("SELECT cid FROM {memetracker_clicks} WHERE cid = 
+    23141221 AND mid = 1131"));
+    $this->assertEqual('23141221', $result, 'Tests insert of click data into database');
+  }
+  
+  /*
+   * Test validation for non-numeric content and memetracker ids on memetracker_set_click
+   * in memetracker.module
+   */
+  function testMemetrackerSetClickValidation() {
+    $result1 = memetracker_set_click('hi', 'everyone');
+    $result2 = memetracker_set_click('reading', 1);
+    $result3 = memetracker_set_click(2, 'this test');
+    $this->assertFalse($result1, t('Test non-numeric validation for memetracker_set_click.
+    Tests with both cid and mid as strings'));
+    $this->assertFalse($result2, t('Test non-numeric validation for memetracker_set_click.
+    Tests with cid as a string and mid as a number'));
+    $this->assertFalse($result3, t('Test non-numeric validation for memetracker_set_click.
+    Tests with cid as a number and mid as a string'));
+  }
+  
+  
+/**************************************************************
+*** Tests for memetracker.inc
+***************************************************************/
+// need to create a bunch stuff (memetracker / content_source / content) to test the APIs
+
+  /*
+   * Instantiate memetracker and load a content source
+   */
+  function testLoadContentSource() {
+    $memetracker = new memetracker(1);
+    
+    // Content_sources are stored as string and only loaded as needed
+    // We grab one string here
+    $content_source_string = $memetracker->get_content_sources();
+    $content_source_string = $content_source_string[0];
+
+    // Load content_source object
+    $content_source = $memetracker->load_content_source($content_source_string);
+    $this->assertNotNull($content_source, "Make sure content_source objects are
+    loaded properly");
+  }
+  
+#  /* Can't catch fatal errors apperently -- I should validate somewhere that 
+#   * a content source being loaded is real
+#   * Try loading a content source that doesn't exist
+#   */
+#  function testLoadContentSourceValidate() {
+#    $memetracker = new memetracker(1);
+#    
+#    // Try loading a content_source object
+#    $content_source = $memetracker->load_content_source('this_class_does_not_exist');
+#    $this->assertFalse($content_source, "Only real content source classese are loaded
+#    by memetracker->load_content_source");
+#  }
+  /*
+   * Test loading of machine learning objects
+   */
+  function testLoadMachineLearningObject() {
+    $memetracker = new memetracker(1);
+    $mlObj = $memetracker->test_get_ml_instance();
+    $this->assertNotNull($mlObj);
+  }
+  
+/**************************************************************
+*** Tests for content.inc
+***************************************************************/
+  /*
+   * Test creating different content classes
+   */
+  function testContentObjectCreation() {
+    // Instantiate new content objects
+    $node = $this->drupalCreateNode(array('type' => 'story'));
+    
+    $content_drupal_node = new content_drupal_node(1, Null, $node->nid, Null);
+    $content_drupal_feedapi = new content_drupal_feedapi(1, Null, 
+    100000);
+    
+    $int_id_cdn = db_result(db_query("SELECT int_id FROM {memetracker_content}
+    WHERE cid = %d", $content_drupal_node->get_cid()));
+    
+    $int_id_cdf = db_result(db_query("SELECT int_id FROM {memetracker_content}
+    WHERE content_type = 'content_drupal_feedapi' AND mid = 1"));
+    
+    $this->assertEqual($node->nid, $int_id_cdn, 'Make sure content_drupal_node is
+    instantiated and saved properly to the database');
+    $this->assertEqual('100000', $int_id_cdf, 'Make sure 
+    content_drupal_feedapi is instantiated and saved properly to the database');
+    
+    // Make sure content objects have a mid
+    $this->assertNotNull($content_drupal_node->get_mid(), "Ensure content objects
+    are created with mid set");
+    
+    // clean up
+    db_query("DELETE FROM {memetracker_content} WHERE int_id = 100000");
+    db_query("DELETE FROM {memetracker_content} WHERE int_id = %d", $node->nid);
+    
+    
+  }
+  
+  /*
+   * Test that content_drupal_node loads its node objects
+   */
+  function testDrupalNodeLoad() {
+    $node = $this->drupalCreateNode(array('type' => 'story'));
+    $content_drupal_node = new content_drupal_node(1, Null, $node->nid, Null);
+    $node2 = $content_drupal_node->get_node_instance();
+    $this->assertNotNull($node2->nid, 'Make sure content_drupal_node can load its
+    node object.');
+  }
+  
+  /*
+   * Test that content_drupal loads metadata such as content_type and timestamp.
+   */
+  function testDrupalLoadMeta() {
+    // Instantiate new content objects
+    $node = $this->drupalCreateNode(array('type' => 'story'));
+    
+    $content_drupal_node = new content_drupal_node(1, Null, $node->nid, Null, 12313);
+    
+    // Load content object again
+    $content_obj2 = new content_drupal_node(1, $content_drupal_node->get_cid(),
+    Null, Null);
+    
+    // Test timestamp is loaded
+    $this->assertNotNull($content_obj2->get_timestamp(), "Test that content obj
+    is loaded with its timestamp");
+    
+    // Test timestamp does not equal 0 (which means a timestamp wasn't set)
+    $this->assertFalse(($content_obj2->get_timestamp() == 0), "Make sure a content obj
+    is not loaded with a timestamp of zero");
+    
+    // Test content_type string is loaded
+    $this->assertNotNull($content_obj2->get_content_type(), "Test that content obj
+    is loaded with its content type");
+  }
+  
+/**************************************************************
+*** Tests for content_sources.inc
+***************************************************************/
+  /* 
+   * Test the different content sources ability to detect new content
+   *
+   * create new nodes and set timestamp before and after
+   * the last cron runs for those content_sources so one should be picked up and 
+   * the other shouldn't be.
+   */
+  function testContentSourceDetectNewContent() {
+    $last_vid = db_result(db_query("SELECT max(vid) FROM {node}"));
+    
+    // Retrieve last time content sources ran so we can set new content before
+    // and after that point
+    $drupal_node_last_cron = db_result(db_query("SELECT last_cron FROM
+    {memetracker_content_source} WHERE cs_name = 'content_source_drupal_node'"));
+        
+    // create two nodes to simulate new content for the content source to 
+    // detect. One row will be timestamped before the last time
+    // the content source ran and one after.
+    $node = $this->drupalCreateNode(array('type' => 'story', 'created' =>
+    $drupal_node_last_cron - 10000));
+    $nid_before = db_last_insert_id('node', 'nid');
+    $node = $this->drupalCreateNode(array('type' => 'story', 'created' =>
+    $drupal_node_last_cron + 10000));
+    $nid_after = db_last_insert_id('node', 'nid');
+        
+    // Run get_content for content_source_drupal_node object
+    $drupal_node_cs = new content_source_drupal_node(1, 2, Null);
+    
+    $node_content_array = $drupal_node_cs->get_content_array();
+    
+    // Check in array of returned content objects if the new content is there and
+    // if the old content is not there
+    $should_be_there_node = False;
+    $should_not_be_there_node = False;
+    foreach ($node_content_array as $node_content) {
+      if ($node_content->get_int_id() == $nid_before) {
+        $should_not_be_there_node = True;
+      }
+      if ($node_content->get_int_id() == $nid_after) {
+        $should_be_there_node = True;
+      }
+    }
+
+    // assert
+    $this->assertTrue($should_be_there_node, 'Test content_source_drupal_node
+    that it detects new nodes only after time of its last cron run');
+    $this->assertFalse($should_not_be_there_node, 'Test content_source_drupal_node
+    that it does not detect nodes with timestamps before the time of its last cron run'); 
+    
+  }
+  
+  /*
+#   * Test content_source_drupal_feedapi 
+#   */
+#  function testContentSourceFeedapi() {
+#    
+#    feedapi_create_node($param, $url);
+#    
+#  }
+
+  /*
+   * Test that content_source_drupal_node is saving a new 'last_cron' time after checking
+   * for new content
+   */
+  function testContentSourceNodeSaveCronTime() {
+    $content_source = new content_source_drupal_node(1, 2, Null);
+    $old_time = $content_source->last_cron;
+    $content_source->get_content_array();
+    $new_time = $content_source->last_cron;
+
+    // Assert that two timestamps are not equal
+    $this->assertNotEqual($old_time, $new_time, "Make sure content_source node saves
+    new last_cron time after getting new content");
+  }
+  
+  /*
+   * Test that content_source_drupal_aggregator is saving a new 'last_cron' time after checking
+   * for new content
+   */
+  function testContentSourceAggregatorSaveCronTime() {
+    $content_source = new content_source_drupal_node(1, 2, Null);
+    $old_time = $content_source->last_cron;
+    $content_source->get_content_array();
+    $new_time = $content_source->last_cron;
+
+    // Assert that two timestamps are not equal
+    $this->assertNotEqual($old_time, $new_time, "Make sure content_source aggregator saves
+    new last_cron time after getting new content");
+  }  
+  
+  /*
+   * Test that content_source_drupal_node saves a timestamp after detecting a new nodes
+   */
+  function testContentSourceNodeSaveTimestamp() {
+    // Create node with timestamp of time() + 1000
+    $time = time() + 1000;
+    $node = $this->drupalCreateNode(array('created' => $time));
+    $nid = db_last_insert_id('node', 'nid'); // drupal function
+ 
+    // Detect it with a content_source
+    $content_source = new content_source_drupal_node(1, 2, Null);
+    $new_content = $content_source->get_content_array();
+    
+    // Load the new node and assert if a timestamp is set or not
+    if (is_null($new_content)) {
+      $this->fail("Content Source did not detect a new node");
+    }
+    foreach ($new_content as $content) {
+      if ($content->get_int_id() == $nid) {
+        $this->assertEqual($time, $content->get_timestamp(), "Make sure content_source_drupal_node
+        saves a timestamp");
+      }
+      else {
+        $this->fail("Content Source did not detect a new node");
+      }
+    }
+  
+  }
+
+  /*
+   * Test that content_source_drupal_node saves the content timestamp correctly
+   * after detecting a new node
+   */
+  function testContentSourceDrupalNodeSaveTimestamp() {
+    $drupal_node_last_cron = db_result(db_query("SELECT last_cron FROM
+    {memetracker_content_source} WHERE cs_name = 'content_source_drupal_node'"));
+  
+    // Create node with timestamp of time() + 1000
+    $time = time() + 10000;
+    $node = $this->drupalCreateNode(array('type' => 'story', 'created' =>
+    $time));
+    $nid = db_last_insert_id('node', 'nid');
+
+    // Detect it with a content_source
+    $content_source = new content_source_drupal_node(1, 2, Null);
+    $new_content = $content_source->get_content_array();
+
+    foreach ($new_content as $content) {
+      if ($content->get_int_id() == $nid) {
+        $this->assertEqual($time, $content->get_timestamp(), "Make sure content_source_drupal_node
+        saves a timestamp");
+      }
+    }
+    
+  }
+}
