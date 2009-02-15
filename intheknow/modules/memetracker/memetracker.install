@@ -1,0 +1,827 @@
+<?php
+// $Id: memetracker.install,v 1.11 2008/08/30 13:11:17 kylemathews Exp $
+
+/**
+ * @file
+ * Install file for memetracker
+ *
+ */
+
+/**
+ * Implementaton of hook_schema().
+ */ 
+
+function memetracker_schema() {
+  $schema['memetracker'] = array(
+    'description' => t('Stores information for memetracker objects'),
+    'fields' => array(
+      'mid' => array(
+        'description' => t('The primary identifier for a memetracker.'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'ml_api' => array(
+        'description' => t('Machine Learning class that the memetracker uses'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '100'),
+      'last_cron' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE),
+      'distance_threshold' => array(
+        'description' => t('Threshold for stopping clustering'),
+        'type' => 'float',
+        'not null' => TRUE,
+        'default' => 0.9,
+        'unsigned' => TRUE),
+      'num_memes' => array(
+        'description' => t("Limits num of memes on memebrowsing page"),
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE),
+      'num_days' => array(
+        'description' => t('The number of days that can be displayed on the 
+        memetracker'),
+        'type' => 'float',
+        'not null' => TRUE,
+        'default' => 3,
+        'unsigned' => TRUE),
+      'name' => array(
+        'description' => t('The name of memetracker for url + memebrowser page'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '100'),
+    ),
+    'primary key' => array('mid'),
+    'indexes' => array(
+      'feedapi_mid' => array('mid'),
+      'feedapi_ml_api' => array('ml_api'),
+    ),
+  );
+  $schema['memetracker_content_source'] = array(
+    'description' => t('Stores names of content source classes used by a memetracker'),
+    'fields' => array(
+      'mid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE),
+      'cs_name' => array(
+        'description' => t('Class name of a content source'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '100'),
+      'last_cron' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE),
+      'enabled' => array(
+        'type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 1, 
+        'size' => 'tiny'),
+      'data' => array(
+        'description' => t('Stores extra data such as which types of nodes to 
+        retrieve or feed ids that are part of particular memetracker'),
+        'type' => 'blob'),
+    ),
+    'indexes' => array(
+      'memetracker_content_source_mid' => array('mid'),
+      'memetracker_content_source_cs_name' => array('cs_name'),
+    )
+  );
+    
+  $schema['memetracker_content'] = array(
+    'description' => t('Statistics values over the time about the feeds'),
+    'fields' => array(
+      'mid' => array(
+        'description' => t('ID of memetracker which content is associated with'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'cid' => array(
+        'description' => t('Primary ID: Content ID'),
+        'type' => 'serial',
+        'unsigned' => True,
+        'not null' => True,
+      ),
+      'int_id' => array(
+        'description' => t('Internal ID of content, e.g. the Node ID or Item ID from Feedapi'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),        
+      'content_type' => array(
+        'description' => t('Name of content class used for this content'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '60'
+      ),
+      'links' => array(
+        'description' => t('serialized array of links from this content elsewhere'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '300'
+      ),
+      'interestingness' => array(
+        'description' => t('Stores an interestingness score for content'),
+        'type' => 'float',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'timestamp' => array(
+        'description' => t('Creation time of content'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+    ),
+    'primary key' => array('cid'),
+    'indexes' => array(
+      'memetracker_content_mid' => array('mid'),
+      'memetracker_content_cid' => array('cid'),
+      'memetracker_content_int_id' => array('int_id'),
+      'memetracker_content_content_type' => array('content_type'),
+    )
+  );
+
+  $schema['memetracker_clicks'] = array(
+    'description' => t('Records clicks from memebrowsing pages, used to measure 
+    popularity of different'),
+    'fields' => array(
+      'mid' => array(
+        'description' => t('ID of memetracker which content is associated with'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE),
+      'cid' => array(
+        'description' => t('Content ID'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE),
+      'uid' => array(
+        'description' => t('The user ID of the clicker if logged in else the
+        IP address, used to prevent click fraud via unique index'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'length' => '20'
+      ),
+      'timestamp' => array(
+        'description' => t('Time the click is recorded'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE),
+    ),
+    'unique keys' => array(
+      'uid_cid'     => array('cid', 'uid'),
+    ),    
+    'indexes' => array(
+      'memetracker_clicks_mid' => array('mid'),
+      'memetracker_clicks_cid' => array('cid'),
+    )
+  );
+  
+  $schema['memetracker_search_1'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+
+  $schema['memetracker_search_2'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+
+  $schema['memetracker_search_3'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+
+  $schema['memetracker_search_4'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  $schema['memetracker_search_5'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  $schema['memetracker_search_6'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  $schema['memetracker_search_7'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  $schema['memetracker_search_8'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  $schema['memetracker_search_9'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  $schema['memetracker_search_10'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  $schema['memetracker_search_1'] = array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  );
+  
+  return $schema;
+}
+
+/**
+ * Implementaton of hook_install().
+ */
+function memetracker_install() {
+  drupal_install_schema('memetracker');
+  
+    // Create full text indices
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_1} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_2} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_3} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_4} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_5} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_6} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_7} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_8} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_9} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_10} 
+  (content)");
+
+  // memetracker needs to run after any aggregators have pulled in content so in
+  // can add new content to the memetracker_content table
+  db_query("UPDATE {system} SET weight = 100 WHERE name = 'memetracker'");
+
+
+  // Create the default memetracker
+  // Create content source objects in the database
+  $content_sources = array('content_source_drupal_feedapi');
+  
+  // Insert information for the the memetracker object into its table
+  db_query("INSERT INTO {memetracker} VALUES ('', '%s', 0, 0.4, 15, 3, 
+  'memebrowser')", 'simple_classifier1');
+    
+  // Insert info for Content Sources into memetracker_content_source
+  foreach ($content_sources as $content_source) {
+    db_query("INSERT INTO {memetracker_content_source} VALUES (1, '%s', 0, 1, 
+    '%s')"
+    , $content_source, '');
+  }
+
+  drupal_set_message("Please read INSTALL.txt in the memetracker directory 
+  for the remaining installation steps");
+}
+
+/**
+ * Implementaton of hook_uninstall().
+ */
+function memetracker_uninstall() {
+   // Clear memes from cache
+#  cache_clear_all('memetracker', True); // not working for whatever reason
+  
+  drupal_uninstall_schema('memetracker');
+}
+
+function memetracker_update_1() {
+  $ret = array();
+  
+  db_add_field($ret, 'memetracker_content_source', 'enabled', array(
+  'type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 1, 
+  'size' => 'tiny'));
+
+  
+#  db_add_field($ret, 'search_dataset', 'reindex', array(
+#  'type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
+
+  return $ret;
+}
+
+function memetracker_update_2() {
+  $ret = array();
+  
+  // add new table memetracker_search
+  db_create_table($ret, 'memetracker_search_1', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 1 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+
+  db_create_table($ret, 'memetracker_search_2', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 2 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+
+  db_create_table($ret, 'memetracker_search_3', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 3 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+
+  db_create_table($ret, 'memetracker_search_4', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 4 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+  
+  db_create_table($ret, 'memetracker_search_5', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 5 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+  
+  db_create_table($ret, 'memetracker_search_6', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 6 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+  
+  db_create_table($ret, 'memetracker_search_7', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 7 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+  
+  db_create_table($ret, 'memetracker_search_8', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 8 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+  
+  db_create_table($ret, 'memetracker_search_9', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 9 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+  
+  db_create_table($ret, 'memetracker_search_10', array(
+    'description' => t('Contains search indexes for the different memetrackers.'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('Content ID for row'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'unsigned' => TRUE
+      ),
+      'content' => array(
+        'description' => t('Title and body of content from memetracker 10 with 
+        HTML tags removed'),
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '0',
+        'length' => '500',
+      ),
+    ),
+    'indexes' => array(
+    'cid' => array('cid'),
+    ),
+  ));
+  
+  // Create full text indices
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_1} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_2} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_3} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_4} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_5} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_6} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_7} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_8} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_9} 
+  (content)");
+  db_query("CREATE FULLTEXT INDEX content_index ON {memetracker_search_10} 
+  (content)");
+  
+  return $ret;
+}
+
+function memetracker_update_3() {
+  $ret = array();
+  
+  db_query("TRUNCATE {machinelearningapi_distance_cache}");
+
+  // Move old content to new memetracker_search_N tables
+  $results = db_query("SELECT m.mid FROM {memetracker} m ORDER BY m.last_cron");
+  while ($data = db_fetch_array($results)) {
+    $memetracker = memetracker_load($data['mid']);
+    $results2 = db_query("SELECT cid, content FROM {memetracker_content} WHERE
+    mid = %d", $memetracker->get_mid());
+    
+    while ($content = db_fetch_array($results2)) {
+      db_query("INSERT INTO {memetracker_search_%d} VALUES (%d, '%s')",
+      $memetracker->get_mid(), $content['cid'], $content['content']);
+    }
+  }
+  
+  // Drop old field used for the fulltext index.
+  db_drop_field($ret, 'memetracker_content', 'content');  
+
+  // Drop old field used for the storing the source -- now dynamically created.
+  db_drop_field($ret, 'memetracker_content', 'source');
+  
+  return $ret;
+}
