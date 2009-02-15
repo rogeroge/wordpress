@@ -1,0 +1,22 @@
+<?php
+// $Id: auto_categorise.install,v 1.1 2008/08/31 12:24:35 matslats Exp $
+
+$blank_messages = false;
+
+/**
+ * Implementation of hook_install().
+ */
+function auto_categorise_install() {
+  variable_set('auto_vids', array());
+}
+
+/**
+ * Implementation of hook_uninstall().
+ * http://api.drupal.org/api/function/hook_uninstall/6
+ * Remove any tables or variables that the module sets.
+ */
+function auto_categorise_uninstall() {
+  variable_del('auto_vids');
+}
+
+?>
