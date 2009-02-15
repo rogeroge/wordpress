@@ -1,0 +1,216 @@
+<?php
+// $Id: memetracker.module,v 1.8 2008/08/30 13:11:17 kylemathews Exp $
+
+/**
+ * @file
+ * Provides glue code for Memetracker code ecosystem.
+ * Memetracker is a smart aggregator.
+ */
+
+require_once 'memetracker.inc';
+require_once 'content_source.inc';
+
+/*
+ * Implmentation of hook_menu().
+ */
+function memetracker_menu() {
+  $items['memetracker/%memetracker'] = array(
+    'title' => 'Memebrowser',
+    'page callback' => 'memetracker_view_memes',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['memetracker/%/new'] = array(
+    'title' => t('New Memetracker'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('memetracker_new_form'),
+    'access arguments' => array('create memebrowser'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 4,
+    'file' => 'memetracker.admin.inc',
+  );
+  $items['memetracker/%/view'] = array(
+    'title' => t('View'),
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['memetracker/%memetracker/edit'] = array(
+    'title' => t('Edit'),
+    'weight' => 1,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('memetracker_edit_form', 1),
+    'access arguments' => array('edit memebrowser'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'memetracker.admin.inc',
+  );
+  $items['memetracker/%memetracker/edit-feeds'] = array(
+    'title' => t('Edit Feed List'),
+    'weight' => 2,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('memetracker_edit_feed_list_form', 1),
+    'access arguments' => array('edit memebrowser'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'memetracker.admin.inc',
+  );
+  $items['memetracker/%memetracker/refresh'] = array(
+    'title' => t('Refresh'),
+    'weight' => 3,
+    'page callback' => 'memetracker_refresh',
+    'page arguments' => array(1),
+    'access arguments' => array('edit memebrowser'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'memetracker.admin.inc',
+  );
+  $items['memetracker_click/%/%'] = array(
+    'page callback' => 'memetracker_set_click',
+    'page arguments' => array(1, 2),
+    'type' => MENU_CALLBACK,
+    'access arguments' => array('record click data'),
+  );
+#  $items['node/add/memetracker'] = array(
+#    'title' => ''
+#  )
+
+
+  return $items;
+}
+
+/*
+ * Implmentation of hook_theme().
+ */
+ 
+function memetracker_theme() {
+  return array(
+    'memebrowser' => array(
+      'template' => 'memebrowser',
+      'arguments' => array('memes' => NULL, 'memetracker' => NULL),
+    ),
+    'meme' => array(
+      'template' => 'meme',
+      'arguments' => array('meme' => Null),
+    ),
+  );
+}
+
+/*
+ * Implmentation of hook_cron().
+ */
+function memetracker_cron() {
+  $reset_cache = True;
+  // Load all memetrackers and check for new content
+  $results = db_query("SELECT m.mid FROM {memetracker} m ORDER BY m.last_cron");
+  while ($data = db_fetch_array($results)) {
+    $memetracker = memetracker_load($data['mid']);
+    
+    // Cleanup content older than number of days * 2 set for memetracker.
+    $memetracker->cleanup();
+    
+    // Train first because new content has nothing to train on.
+    $memetracker->train_on_click_data();
+    
+    $new_content_count = $memetracker->check_new_content();
+    $memetracker->get_memes($reset_cache);
+    $memetracker->save_cron_time();
+    
+    // Save to log.
+    if ($new_content_count > 0) {
+      watchdog('Memetracker', '!name added !count 
+      new content', array('!name' => $memetracker->get_name(), '!count' => 
+      $new_content_count),
+      WATCHDOG_INFO);
+    }
+  }
+}
+
+/*
+ * Implmentation of modulename_preprocess_page().
+ * Function sets title of memebrowsing pages.
+ */
+function memetracker_preprocess_page(&$variables) {
+  if (arg(0) == 'memetracker' && is_numeric(arg(1))) {
+    $memetracker = memetracker_load(arg(1));
+    if ($memetracker) {
+      $variables['title'] = $memetracker->get_name();
+    }
+  }
+}
+
+/*
+ * Save click sent from browser via XHttpRequest.
+ */
+function memetracker_set_click($mid, $cid) { // eventually will pull in page region as well
+  if (!is_numeric($mid) OR !is_numeric($cid)) {
+    return false;
+  }  
+  
+  // Get uid if user authenticated or IP if not
+  global $user;
+  if ($user->uid) {
+    $uid = $user->uid;
+  }
+  else {
+    $uid = ip_address();
+  }
+  
+  // Insert into database
+  db_query("INSERT INTO {memetracker_clicks} VALUES (%d, %d, '%s', %d)", 
+    $mid, $cid, $uid, time());
+}
+
+/*
+ * Render view of memes.
+ */
+function memetracker_view_memes($memetracker) {
+  $memes = $memetracker->get_memes();
+
+  return theme('memebrowser', $memes, $memetracker);
+}
+
+/**
+* Menu callback; loads a memetracker object.
+*/
+function memetracker_load($mid, $reset = False) {
+  if (!is_numeric($mid)) {
+    return FALSE;
+  }
+  
+  static $memetracker_array;
+  
+  if (!isset($memetracker_array) && !$memetracker_array[$mid] || !$reset) {
+    $memetracker_array[$mid] = new memetracker($mid);
+    if (is_null($memetracker_array[$mid]->get_mid())) {
+      return FALSE;
+    }
+  }
+  
+  return $memetracker_array[$mid];
+}
+
+/**
+* Valid permissions for this module
+* @return array An array of valid permissions for the memetracker module
+*/
+
+function memetracker_perm() {
+  return array('record click data', 'edit memebrowser', 'create memebrowser');
+} // function memetracker_perm()
+
+/*
+* Helper function.
+* Coverts an array to a string ready to be used in a where in clause of an
+* sql query.
+*/
+function array_to_sql_string($array) {
+    $sql_str = "";
+    if (empty($array)) {
+      return;
+    }
+    
+    foreach ($array as $a) {
+      $sql_str .= '\''. $a .'\',';
+    }
+    $sql_str = trim($sql_str, ',');
+    
+    return $sql_str;
+}
