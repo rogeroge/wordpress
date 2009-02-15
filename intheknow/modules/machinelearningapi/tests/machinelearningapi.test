@@ -1,0 +1,117 @@
+<?php
+// $Id: machinelearningapi.test,v 1.4 2008/08/11 22:28:24 kylemathews Exp $
+
+require_once 'content_array';
+
+
+class MachineLearningAPIModuleTestCase extends DrupalTestCase {
+
+//TODO add tests for each method/function
+  function get_info() {
+    return array(
+      'name' => t('Machinelearningapi functionality'),
+      'desc' => t('Thoroughly test Machinelearningapi administration and user interfaces.'),
+      'group' => t('Memetracker Tests'),
+    );
+  }
+
+  /**
+   * SimpleTest core method: code run before each and every test method.
+   *
+   * Optional. You only need this if you have setup tasks.
+   */
+  function setUp() {
+    parent::setUp();
+
+    // Setup tasks go here.
+    include_once './'. drupal_get_path('module', 'machinelearningapi') .'/machine_learning_api.inc';
+    
+    // Read in content_array
+#    $file = realpath(drupal_get_path('module', 'machinelearningapi') .'/tests/content_array');
+#    $fh = fopen($file, 'r');
+#    $theData = fread($fh, filesize($file));
+#    fclose($fh);
+#    dpm($theData);
+#    $this->content_array = unserialize($theData);
+#    dpm($this->content_array);
+#    dpm(get_content_array());
+    
+    // Define sample distance matrix to test clustering code
+    // More about distance_matrixes above get_distance_scores() methods
+    $this->distance_matrix = array(
+      '0' => array(0.0, 1.2, 4.4),
+      '1' => array(1.2, 0.0, 0.5),
+      '2' => array(4.4, 0.5, 0.0),
+    );
+    
+  }
+
+  /**
+   * SimpleTest core method: code run after each and every test method.
+   *
+   * Optional. You only need this if you have teardown tasks.
+   */
+  function tearDown() {
+    // Teardown tasks go here.
+
+    // Delete dummy content
+    db_query("DELETE FROM {memetracker_content} WHERE int_id = '110000' and mid = 1");
+
+    parent::tearDown();
+  }
+  
+/**************************************************************
+*** Tests for machinelearningapi.module
+***************************************************************/
+
+/**************************************************************
+*** Tests for machinelearningapi.inc
+***************************************************************/  
+  /*
+   * Test loading of naive_bayes objects
+   */
+  function testLoadNaiveBayesObject() {
+    $simple = new simple_classifier1(1);
+    $naive_bayes_obj = $simple->get_naive_bayes_instance();
+    $this->assertNotNull($naive_bayes_obj, "Test loading of naive_bayes object
+    through instantiation of simple_classfier1");
+  }
+  
+  /*
+   * Test that how_interesting() method will classify content and 
+   * return a numeric score of the content's "interestingness"
+   */
+  function testHowInteresting() {
+    // Instantiate new machine learning api object
+    $simple = new simple_classifier1(1);
+    
+    // Instantiate new content object we will use to test
+    $content = new content_drupal_node(1, Null, 110000);
+    $content_string = "Chicken little once wrote something extrodinarily insignificant.";
+    
+    // Insert content_string into the database
+    db_query("INSERT INTO {memetracker_search_1} VALUES (%d, '%s')",
+    $content->get_cid(), $content_string);
+    
+    // Get an interestingness score
+    $interestingness_score = $simple->how_interesting($content);
+
+    // Test if numeric
+    $answer = is_numeric($interestingness_score);
+    
+    $this->assertTrue($answer, 'Make sure that how_interesting() returns a numeric answer');
+  }
+  
+#  /*
+#   * Test normalize_distances methods
+#   */
+#  function testNormalizeDistance() {
+#    // Instantiate new machine learning api object
+#    $simple = new simple_classifier1();
+#    
+#    $normalized_distance_matrix = $simple->normalize_distances($this->distance_matrix);
+#    fwrite($this->fh, print_r($normalized_distance_matrix));
+#  }
+}
+
+
