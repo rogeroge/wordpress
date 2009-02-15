@@ -1,0 +1,22 @@
+<?php
+// $Id: please_register.install,v 1.1.2.1 2008/05/12 21:56:52 tomaszx Exp $
+
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function please_register_uninstall() {
+  variable_del('please_register_anon_what_can');
+  variable_del('please_register_anon_what_not_can');
+  variable_del('please_register_auth_what_can');
+  variable_del('please_register_deny_list');
+  variable_del('please_register_allow_list');
+  variable_del('please_register_allow_list_select');
+  variable_del('please_register_deny_list_select');
+
+  variable_del('please_register_info_what_can');
+  variable_del('please_register_info_why_register');
+  
+  variable_del('please_register_subject_auth');
+  variable_del('please_register_subject_noauth');
+}
