@@ -1,0 +1,14 @@
+; $Id: memetracker.info,v 1.8 2008/08/30 13:11:17 kylemathews Exp $
+name = Memetracker
+description = "Intelligently clusters content by meme"
+package = Memetracker
+core=6.x
+dependencies[] = feedapi_node
+php = 5.1
+
+; Information added by drupal.org packaging script on 2008-08-30
+version = "6.x-1.1-alpha6"
+core = "6.x"
+project = "memetracker"
+datestamp = "1220103025"
+
