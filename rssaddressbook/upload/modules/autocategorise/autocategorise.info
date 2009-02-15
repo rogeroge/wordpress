@@ -1,0 +1,12 @@
+; $Id: autocategorise.info,v 1.1 2009/01/06 12:02:21 matslats Exp $
+name = autocategorise
+description = Categorises certain node-types on submission, using selected vocabularies
+dependencies[] = taxonomy
+core = "6.x"
+
+; Information added by drupal.org packaging script on 2009-01-25
+version = "6.x-1.3"
+core = "6.x"
+project = "autocategorise"
+datestamp = "1232915102"
+
