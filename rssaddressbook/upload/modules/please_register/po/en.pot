@@ -1,0 +1,113 @@
+# $Id: en.pot,v 1.1.2.1 2008/05/12 21:56:53 tomaszx Exp $
+#
+# LANGUAGE translation of Drupal (general)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+#  please_register.module,v 1.1.2.1 2008/04/16 19:55:18 tomaszx
+#  please_register.info: n/a
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2008-05-12 23:30+0200\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: please_register.module:21 please_register.info:0
+msgid "Please register"
+msgstr ""
+
+#: please_register.module:30
+msgid "Custom subject for authenticated users"
+msgstr ""
+
+#: please_register.module:36
+msgid "Custom subject for anonymous users"
+msgstr ""
+
+#: please_register.module:44
+msgid "This options are based on perm from authenticated role."
+msgstr ""
+
+#: please_register.module:49
+msgid "Show authenticated users what can do it"
+msgstr ""
+
+#: please_register.module:56
+msgid "This options are based on perm from anonymous role."
+msgstr ""
+
+#: please_register.module:61
+msgid "Show anonymous what can do it"
+msgstr ""
+
+#: please_register.module:66
+msgid "Custom info about what user can"
+msgstr ""
+
+#: please_register.module:73
+msgid "Show anonymous what cannot do it"
+msgstr ""
+
+#: please_register.module:78
+msgid "Custom info about why user should register"
+msgstr ""
+
+#: please_register.module:83
+msgid "You can add some own perm to display anonymous users and inform they what can and not can do it."
+msgstr ""
+
+#: please_register.module:91
+msgid "None"
+msgstr ""
+
+#: please_register.module:92
+msgid "All"
+msgstr ""
+
+#: please_register.module:93
+msgid "anonymous"
+msgstr ""
+
+#: please_register.module:94
+msgid "authenticated"
+msgstr ""
+
+#: please_register.module:99;116
+msgid "Display users with role"
+msgstr ""
+
+#: please_register.module:106
+msgid "Custom DENY list "
+msgstr ""
+
+#: please_register.module:110;127
+msgid "Enter one perm per line. Example: !example"
+msgstr ""
+
+#: please_register.module:123
+msgid "Custom ALLOW list "
+msgstr ""
+
+#: please_register.module:312
+msgid "You can register now"
+msgstr ""
+
+#: please_register.module:0
+msgid "please_register"
+msgstr ""
+
+#: please_register.info:0
+msgid "Provide a block with information why users should register."
+msgstr ""
+
+#: please_register.info:0
+msgid "User managament"
+msgstr ""
+
